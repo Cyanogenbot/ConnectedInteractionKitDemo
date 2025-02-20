@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flight Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="oocsi-web.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            font-size: 16px;
+            line-height: 1.6;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .value {
+            color: #64ffda;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+<div id="info">
+    Altitude: <span class="value">0m</span><br>
+    Bank: <span class="value">0&deg</span><br>
+    Nose: <span class="value">0&deg</span><br>
+    Heading: <span class="value">0&deg</span><br>
+    Temperature: <span class="value">0&degC</span><br>
+    Humidity: <span class="value">0 RH</span>
+</div>
+<script>
+    OOCSI.connect('wss://hello.oocsi.net/ws');
+
+    // Scene setup
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x87CEEB, 0.015);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x87CEEB);
+    document.body.appendChild(renderer.domElement);
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0x404040);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(5, 5, 5);
+    scene.add(directionalLight);
+
+    // Create sky background
+    function createSky() {
+        const skyGeometry = new THREE.SphereGeometry(500, 32, 32);
+        const skyMaterial = new THREE.MeshBasicMaterial({
+            color: 0x87CEEB,
+            side: THREE.BackSide,
+            fog: false
+        });
+        const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+        scene.add(sky);
+
+        // Add distant mountains silhouette
+        const bgMountainGeometry = new THREE.PlaneGeometry(1000, 100);
+        const bgMountainMaterial = new THREE.MeshBasicMaterial({
+            color: 0x2d4a3e,
+            transparent: true,
+            opacity: 0.8,
+            fog: false
+        });
+        const bgMountains = new THREE.Mesh(bgMountainGeometry, bgMountainMaterial);
+        bgMountains.position.set(0, 30, -400);
+        scene.add(bgMountains);
+    }
+
+    // Create landscape
+    function createLandscape() {
+        const group = new THREE.Group();
+
+        // Mountains with more detail
+        const mountainGeometry = new THREE.ConeGeometry(20, 30, 6);
+        const mountainMaterial = new THREE.MeshPhongMaterial({
+            color: 0x4a5568,
+            flatShading: true
+        });
+
+        for (let i = 0; i < 15; i++) {
+            const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
+            mountain.position.set(
+                (Math.random() - 0.5) * 200,
+                -20,
+                (Math.random() - 0.5) * 200
+            );
+            mountain.rotation.y = Math.random() * Math.PI;
+            mountain.scale.set(
+                0.5 + Math.random() * 1.5,
+                0.5 + Math.random() * 1.5,
+                0.5 + Math.random() * 1.5
+            );
+            group.add(mountain);
+        }
+
+        // Terrain with hills
+        const terrainGeometry = new THREE.PlaneGeometry(1000, 1000, 100, 100);
+        const vertices = terrainGeometry.attributes.position.array;
+        for (let i = 0; i < vertices.length; i += 3) {
+            if (i !== 1) {
+                vertices[i + 1] = Math.sin(vertices[i] / 20) * Math.cos(vertices[i + 2] / 20) * 5;
+            }
+        }
+        terrainGeometry.computeVertexNormals();
+
+        const terrainMaterial = new THREE.MeshPhongMaterial({
+            color: 0x2d5a42,
+            flatShading: true
+        });
+        const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
+        terrain.rotation.x = -Math.PI / 2;
+        terrain.position.y = -20;
+        group.add(terrain);
+
+        // Add forest patches
+        const treeGeometry = new THREE.ConeGeometry(2, 8, 6);
+        const treeMaterial = new THREE.MeshPhongMaterial({ color: 0x1a472a });
+
+        for (let i = 0; i < 200; i++) {
+            const tree = new THREE.Mesh(treeGeometry, treeMaterial);
+            const x = (Math.random() - 0.5) * 400;
+            const z = (Math.random() - 0.5) * 400;
+            const y = Math.sin(x / 20) * Math.cos(z / 20) * 5 - 16; // Match terrain height
+            tree.position.set(x, y, z);
+            tree.scale.set(0.5 + Math.random() * 0.5, 0.5 + Math.random() * 0.5, 0.5 + Math.random() * 0.5);
+            group.add(tree);
+        }
+
+        return group;
+    }
+
+    createSky();
+    const landscape = createLandscape();
+    scene.add(landscape);
+
+    // Create clouds (same as before)
+    function createCloud() {
+        const cloud = new THREE.Group();
+        const geometryCore = new THREE.SphereGeometry(1, 7, 7);
+        const materialCore = new THREE.MeshPhongMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.8
+        });
+
+        const parts = 5 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < parts; i++) {
+            const cloudPart = new THREE.Mesh(geometryCore, materialCore);
+            cloudPart.position.set(
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5),
+                (Math.random() - 0.5) * 2
+            );
+            cloudPart.scale.set(
+                1 + Math.random(),
+                0.8 + Math.random(),
+                1 + Math.random()
+            );
+            cloud.add(cloudPart);
+        }
+        return cloud;
+    }
+
+    const clouds = new THREE.Group();
+    for (let i = 0; i < 50; i++) {
+        const cloud = createCloud();
+        cloud.position.set(
+            (Math.random() - 0.5) * 200,
+            10 + Math.random() * 20,
+            (Math.random() - 0.5) * 200
+        );
+        cloud.scale.setScalar(2 + Math.random() * 3);
+        clouds.add(cloud);
+    }
+    scene.add(clouds);
+
+    // Rest of the code remains the same from here...
+    function createAirplane() {
+        const group = new THREE.Group();
+
+        const fuselageGeometry = new THREE.CylinderGeometry(0.2, 0.2, 4, 8);
+        const fuseMaterial = new THREE.MeshPhongMaterial({ color: 0xeeeeee });
+        const fuselage = new THREE.Mesh(fuselageGeometry, fuseMaterial);
+        fuselage.rotation.z = Math.PI / 2;
+        group.add(fuselage);
+
+        const wingGeometry = new THREE.BoxGeometry(1, 0.1, 6);
+        const wingMaterial = new THREE.MeshPhongMaterial({ color: 0xeeeeee });
+        const wings = new THREE.Mesh(wingGeometry, wingMaterial);
+        group.add(wings);
+
+        const tailGeometry = new THREE.BoxGeometry(0.5, 0.1, 1.5);
+        const tail = new THREE.Mesh(tailGeometry, wingMaterial);
+        tail.position.x = -1.5;
+        group.add(tail);
+
+        const verticalGeometry = new THREE.BoxGeometry(1, 1, 0.1);
+        const vertical = new THREE.Mesh(verticalGeometry, wingMaterial);
+        vertical.position.x = -1.5;
+        vertical.position.y = 0.5;
+        group.add(vertical);
+
+        return group;
+    }
+
+    const airplane = createAirplane();
+    scene.add(airplane);
+
+    camera.position.set(10, 5, 10);
+    camera.lookAt(0, 0, 0);
+
+    const currentValues = {
+        roll: 0,
+        pitch: 0,
+        yaw: 0,
+        height: 0
+    };
+
+    const targetValues = {
+        roll: 0,
+        pitch: 0,
+        yaw: 0,
+        height: 0,
+        humidity: 0,
+        temperature: 0
+    };
+
+    const interpolationFactor = 0.1;
+    const cameraOffset = new THREE.Vector3(10, 5, 10);
+    const cameraTarget = new THREE.Vector3();
+
+    function updateAtmosphere() {
+        clouds.children.forEach((cloud, index) => {
+            cloud.children.forEach(part => {
+                part.material.opacity = 0.3 + (targetValues.humidity / 100) * 0.7;
+            });
+            cloud.position.y = 10 + Math.sin(Date.now() * 0.0005 + index) * 2;
+        });
+
+        scene.fog.density = 0.01 + (targetValues.humidity / 100) * 0.02;
+    }
+
+    OOCSI.subscribe("circuitpython/plane/controller", function(msg) {
+        if (msg.data.Humidity != null) {
+            targetValues.humidity = msg.data.Humidity;
+            targetValues.temperature = msg.data.Temp;
+            updateAtmosphere();
+        }
+
+        if (msg.data.roll != null) {
+            targetValues.roll = msg.data.roll;
+            targetValues.pitch = msg.data.pitch;
+            targetValues.yaw = msg.data.yaw;
+            targetValues.height = msg.data.height;
+        }
+    });
+
+    function lerp(start, end, factor) {
+        return start + (end - start) * factor;
+    }
+
+    function normalizeAngle(angle) {
+        angle = angle % 360;
+        if (angle > 180) angle -= 360;
+        if (angle < -180) angle += 360;
+        return angle;
+    }
+
+    function interpolateAngle(start, end, factor) {
+        let diff = normalizeAngle(end - start);
+        return start + diff * factor;
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        currentValues.roll = interpolateAngle(currentValues.roll, targetValues.roll, interpolationFactor);
+        currentValues.pitch = interpolateAngle(currentValues.pitch, targetValues.pitch, interpolationFactor);
+        currentValues.yaw = interpolateAngle(currentValues.yaw, targetValues.yaw, interpolationFactor);
+        currentValues.height = lerp(currentValues.height, targetValues.height, interpolationFactor);
+
+        airplane.rotation.set(
+            currentValues.pitch * Math.PI / 180,
+            currentValues.yaw * Math.PI / 180,
+            currentValues.roll * Math.PI / 180,
+            'XYZ'
+        );
+        airplane.position.y = currentValues.height;
+
+        updateAtmosphere();
+
+        const idealOffset = cameraOffset.clone()
+            .applyAxisAngle(new THREE.Vector3(0, 1, 0), currentValues.yaw * Math.PI / 180);
+        camera.position.lerp(airplane.position.clone().add(idealOffset), 0.02);
+        cameraTarget.lerp(airplane.position, 0.02);
+        camera.lookAt(cameraTarget);
+
+        document.getElementById('info').innerHTML = `
+            Altitude: <span class="value">${currentValues.height.toFixed(1)}m</span><br>
+            Bank: <span class="value">${currentValues.roll.toFixed(1)}&deg</span><br>
+            Nose: <span class="value">${currentValues.pitch.toFixed(1)}&deg</span><br>
+            Heading: <span class="value">${currentValues.yaw.toFixed(1)}&deg</span><br>
+            Temperature: <span class="value">${targetValues.temperature.toFixed(1)}&degC</span><br>
+            Humidity: <span class="value">${targetValues.humidity.toFixed(1)}%</span>
+        `;
+
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+</script>
+</body>
+</html>
