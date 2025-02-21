@@ -1,5 +1,7 @@
 # Demo of Arduino Nano ESP32 in CircuitPython with OOCSI, DHT sensor, and 1602A LCD modules
 
+This prototyping connects to the Internet with integrated wifi module and sends the humidity and temperature data to OOCSI, which is measured by DHT22 module, and at the mean time, the data is also displayed on the 1602A LCD module.
+
 <br />
 
 ## Hardware
