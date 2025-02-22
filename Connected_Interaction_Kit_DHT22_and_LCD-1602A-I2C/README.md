@@ -15,7 +15,7 @@ This prototyping connects to the Internet with integrated wifi module and sends 
 ## What's on LCD display
 
 It shows the temperature and humidity value returned by the DHT22 module. <br />
-But the lower part of first line is defected, so the first line only has upper part working.
+But the lower part of first line is defect, so the first line only has upper part working.
 
 ![led demo](images/demo-lcd.jpg)
 
