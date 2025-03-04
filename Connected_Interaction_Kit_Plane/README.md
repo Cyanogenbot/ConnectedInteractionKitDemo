@@ -1,5 +1,5 @@
 # CIK - Plane
-The CIK
+This is an example of using OOCSI on the Connected Interaction Kit running CircuitPython. It consists of a array of sensors sending OOCSI messages on acceleration and height to the `circuitpython/plane/controller` oocsi channel.
 <br />
 
 ## Hardware
@@ -21,5 +21,17 @@ The following table shows to which sensor is connected what port on the board, h
 | DFRobot BMI160  | I2C port 1 |
 | TOF Sensor | I2C port 2 |
 
+## Lasercut
+The plane also comes with an (Editable) PDF file of a plane used for lasercutting the chasis. Here is the colourmapping used:
 
-![wiring](images/demo-ring.jpg)
+| Color |Action|
+| --- | --- |
+| Blue  | Cut lines |
+| Red | Vector Marking |
+
+## Message content:
+The OOCSI messages sent to
+| Key | Value|
+| --- | --- |
+| Blue  | Cut lines |
+| Red | Vector Marking |
