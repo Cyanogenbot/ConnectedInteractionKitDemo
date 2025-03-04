@@ -11,7 +11,7 @@ The CIK
 <br />
 
 ## Wiring
-> [!WARNING]
+> [!CAUTION]
 > The DFROBOT BMI160 sensor uses a gravity port which is form factor compatible with the grove port **BUT DOES NOT** have the same pinout! This can be easily overcome by swapping the position of the Ground and Positive lead and the Data and clock lead on ONE side of the cable.
 
 The following table shows to which sensor is connected what port on the board, however as both sensors are using I2C this does not really matter.
